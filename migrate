@@ -1,0 +1,46 @@
+#!/usr/bin/env php
+<?php 
+
+require_once __DIR__.'/lib/autoload.php';
+require_once __DIR__.'/app/config.php';
+use Illuminate\Database\Capsule\Manager as DB;
+
+define ('DB_MIGRATION_SCHEMA_PATH', __DIR__.'/app/migrations');
+
+class Main {
+	public function __construct($args) {
+		$this->args = $args;
+	}
+	private function help() {
+		echo "usage: php ".$this->args[0]." (createTables)\n";
+	}
+	public function run() {
+		if (count($this->args) <= 1) {
+			$this->help();
+		} else switch ($this->args[1]) {
+			case "createTables":
+				$this->createTables();
+				break;
+			default:
+				$this->help();
+				break;
+		}
+	}
+	private function createTables() {
+		$files = glob(DB_MIGRATION_SCHEMA_PATH.'/*.php');
+		foreach ($files as $file) {
+			require_once $file;
+			try {
+				$class = basename($file, '.php');
+				$table = new $class;
+				$table->createTables();
+				echo "Created table '$class'\n";
+			} catch (Exception $e) {
+				echo "Error creating table '$table->getTable()': $e->getMessage()\n";
+			}
+		}
+	}
+}
+
+$Main = new Main($argv);
+$Main->run();
