@@ -5,38 +5,60 @@ require_once __DIR__.'/lib/autoload.php';
 require_once __DIR__.'/app/config.php';
 use Illuminate\Database\Capsule\Manager as DB;
 
-define ('DB_MIGRATION_SCHEMA_PATH', __DIR__.'/app/migrations');
+define ('DB_MIGRATION_SCHEMA_PATH', __DIR__.'/app/database');
 
 class Main {
 	public function __construct($args) {
 		$this->args = $args;
+		$this->options = [
+			'up' => 'Created',
+			'down' => 'Reset',
+			'seed' => 'Seed',
+		];
 	}
 	private function help() {
-		echo "usage: php ".$this->args[0]." (createTables)\n";
+		echo "usage: php ".$this->args[0]." (up/down/seed)\n";
 	}
 	public function run() {
-		if (count($this->args) <= 1) {
+		if (count($this->args) <= 1)
 			$this->help();
-		} else switch ($this->args[1]) {
-			case "createTables":
-				$this->createTables();
-				break;
-			default:
-				$this->help();
-				break;
-		}
+		else if ($this->args[1] == 'select')
+			$this->select();
+		else if (!isset($this->options[$this->args[1]]))
+			$this->help();
+		else
+			$this->migrate($this->args[1], $this->options[$this->args[1]]);
 	}
-	private function createTables() {
+	private function migrate($routine, $label) {
 		$files = glob(DB_MIGRATION_SCHEMA_PATH.'/*.php');
 		foreach ($files as $file) {
 			require_once $file;
+			$class = null;
 			try {
 				$class = basename($file, '.php');
-				$table = new $class;
-				$table->createTables();
-				echo "Created table '$class'\n";
+				$migrate = $class."Migration";
+				$table = new $migrate;
+				call_user_func([$table, $routine]);
+				echo "$label table '$class'\n";
 			} catch (Exception $e) {
-				echo "Error creating table '$table->getTable()': $e->getMessage()\n";
+				echo "No migration for class '$class': $e->getMessage()\n";
+			}
+		}
+	}
+	private function select() {
+		$files = glob(DB_MIGRATION_SCHEMA_PATH.'/*.php');
+		foreach ($files as $file) {
+			require_once $file;
+			$class = null;
+			try {
+				$class = basename($file, '.php');
+				$results = call_user_func([$class, 'all']);
+				echo "Select table '$class'\n";
+				foreach ($results as $result) {
+					var_dump($result['attributes']);
+				}
+			} catch (Exception $e) {
+				echo "No migration for class '$class': $e->getMessage()\n";
 			}
 		}
 	}
